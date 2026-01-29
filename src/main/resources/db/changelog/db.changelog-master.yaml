@@ -1,0 +1,86 @@
+databaseChangeLog:
+  - changeSet:
+      id: 1-create-tables
+      author: user
+      changes:
+        # Таблица WRITERS
+        - createTable:
+            tableName: writers
+            columns:
+              - column:
+                  name: id
+                  type: BIGINT
+                  autoIncrement: true
+                  constraints:
+                    primaryKey: true
+              - column:
+                  name: first_name
+                  type: VARCHAR(255)
+              - column:
+                  name: last_name
+                  type: VARCHAR(255)
+
+        # Таблица LABELS
+        - createTable:
+            tableName: labels
+            columns:
+              - column:
+                  name: id
+                  type: BIGINT
+                  autoIncrement: true
+                  constraints:
+                    primaryKey: true
+              - column:
+                  name: name
+                  type: VARCHAR(255)
+                  constraints:
+                    unique: true
+
+        # Таблица POSTS
+        - createTable:
+            tableName: posts
+            columns:
+              - column:
+                  name: id
+                  type: BIGINT
+                  autoIncrement: true
+                  constraints:
+                    primaryKey: true
+              - column:
+                  name: content
+                  type: TEXT
+              - column:
+                  name: created
+                  type: TIMESTAMP
+              - column:
+                  name: updated
+                  type: TIMESTAMP
+              - column:
+                  name: status
+                  type: VARCHAR(50)
+              - column:
+                  name: writer_id
+                  type: BIGINT
+                  constraints:
+                    foreignKeyName: fk_post_writer
+                    references: writers(id)
+                    deleteCascade: true
+
+        # Таблица связи POSTS <-> LABELS (Many-to-Many)
+        - createTable:
+            tableName: post_labels
+            columns:
+              - column:
+                  name: post_id
+                  type: BIGINT
+                  constraints:
+                    foreignKeyName: fk_pl_post
+                    references: posts(id)
+                    deleteCascade: true
+              - column:
+                  name: label_id
+                  type: BIGINT
+                  constraints:
+                    foreignKeyName: fk_pl_label
+                    references: labels(id)
+                    deleteCascade: true
