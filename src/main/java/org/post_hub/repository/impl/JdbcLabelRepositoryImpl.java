@@ -1,6 +1,6 @@
 package org.post_hub.repository.impl;
 
-import org.post_hub.config.DatabaseConnection;
+import org.post_hub.config.DatabaseUtil;
 import org.post_hub.model.Label;
 import org.post_hub.repository.LabelRepository;
 
@@ -10,7 +10,7 @@ import java.util.List;
 
 public class JdbcLabelRepositoryImpl implements LabelRepository {
 
-    private final Connection connection = DatabaseConnection.getConnection();
+    private final Connection connection = DatabaseUtil.getConnection();
 
     @Override
     public Label getById(Long id) {

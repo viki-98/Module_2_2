@@ -2,6 +2,7 @@ package org.post_hub.service;
 
 import org.post_hub.model.Writer;
 import org.post_hub.repository.WriterRepository;
+import org.post_hub.repository.impl.JdbcWriterRepositoryImpl;
 
 import java.util.List;
 
@@ -9,8 +10,8 @@ public class WriterService {
 
     private final WriterRepository writerRepository;
 
-    public WriterService(WriterRepository writerRepository) {
-        this.writerRepository = writerRepository;
+    public WriterService() {
+        this.writerRepository = new JdbcWriterRepositoryImpl();
     }
 
     public Writer createWriter(String firstName, String lastName) {

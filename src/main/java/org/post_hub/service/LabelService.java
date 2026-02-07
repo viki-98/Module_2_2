@@ -2,14 +2,16 @@ package org.post_hub.service;
 
 import org.post_hub.model.Label;
 import org.post_hub.repository.LabelRepository;
+import org.post_hub.repository.impl.JdbcLabelRepositoryImpl;
 
 import java.util.List;
 
 public class LabelService {
     private final LabelRepository labelRepository;
 
-    public LabelService(LabelRepository labelRepository) {
-        this.labelRepository = labelRepository;
+    public LabelService() {
+
+        this.labelRepository = new JdbcLabelRepositoryImpl();
     }
 
     public Label createLabel(String name) {

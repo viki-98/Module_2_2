@@ -3,6 +3,7 @@ package org.post_hub.service;
 import org.post_hub.model.Post;
 import org.post_hub.model.PostStatus;
 import org.post_hub.repository.PostRepository;
+import org.post_hub.repository.impl.JdbcPostRepositoryImpl;
 
 import java.time.LocalDateTime;
 import java.util.List;
@@ -11,8 +12,8 @@ public class PostService {
 
     private final PostRepository postRepository;
 
-    public PostService(PostRepository postRepository) {
-        this.postRepository = postRepository;
+    public PostService() {
+        this.postRepository = new JdbcPostRepositoryImpl();
     }
 
     public Post createPost(Post post) {

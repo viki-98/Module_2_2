@@ -1,6 +1,6 @@
 package org.post_hub.repository.impl;
 
-import org.post_hub.config.DatabaseConnection;
+import org.post_hub.config.DatabaseUtil;
 import org.post_hub.model.Post;
 import org.post_hub.model.PostStatus;
 import org.post_hub.model.Writer;
@@ -11,7 +11,7 @@ import java.util.ArrayList;
 import java.util.List;
 
 public class JdbcWriterRepositoryImpl implements WriterRepository {
-    private final Connection connection = DatabaseConnection.getConnection();
+    private final Connection connection = DatabaseUtil.getConnection();
 
     @Override
     public Writer save(Writer writer) {
