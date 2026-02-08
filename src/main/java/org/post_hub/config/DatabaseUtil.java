@@ -2,9 +2,7 @@ package org.post_hub.config;
 
 import java.io.IOException;
 import java.io.InputStream;
-import java.sql.Connection;
-import java.sql.DriverManager;
-import java.sql.SQLException;
+import java.sql.*;
 import java.util.Properties;
 
 public final class DatabaseUtil {
@@ -39,9 +37,60 @@ public final class DatabaseUtil {
         return local;
     }
 
+    public static void commit() {
+        try {
+            getInstance().createConnection().commit();
+        } catch (SQLException e) {
+            throw new RuntimeException(e);
+        }
+    }
 
-    public static Connection getConnection() {
+
+    private static Connection getConnection(boolean commit) {
+        Connection connection = getInstance().createConnection();
+        try {
+            connection.setAutoCommit(commit);
+        } catch (SQLException e) {
+            throw new RuntimeException(e);
+        }
+
+        return connection;
+    }
+
+    public static Connection getConnectionForLB() {
         return getInstance().createConnection();
+    }
+
+    public static PreparedStatement getPreparedStatementWithAutoCommit(String query) {
+        try {
+            return getConnection(true).prepareStatement(query);
+        } catch (SQLException e) {
+            throw new RuntimeException(e);
+        }
+    }
+
+    public static PreparedStatement getPreparedStatementWithoutAutoCommit(String query) {
+        try {
+            return getConnection(false).prepareStatement(query);
+        } catch (SQLException e) {
+            throw new RuntimeException(e);
+        }
+    }
+
+    public static PreparedStatement getPreparedStatementGetGeneratedKeys(String query) {
+        try {
+            return getConnection(false).prepareStatement(query, Statement.RETURN_GENERATED_KEYS);
+        } catch (SQLException e) {
+            throw new RuntimeException(e);
+        }
+    }
+
+    public static void rollback() {
+        try {
+            getInstance().createConnection().rollback();
+        } catch (SQLException e) {
+            throw new RuntimeException(e);
+        }
     }
 
     private Connection createConnection() {

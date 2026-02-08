@@ -11,12 +11,11 @@ import java.util.ArrayList;
 import java.util.List;
 
 public class JdbcWriterRepositoryImpl implements WriterRepository {
-    private final Connection connection = DatabaseUtil.getConnection();
 
     @Override
     public Writer save(Writer writer) {
         String sql = "INSERT INTO writers (first_name, last_name) VALUES (?, ?)";
-        try (PreparedStatement statement = connection.prepareStatement(sql, Statement.RETURN_GENERATED_KEYS)) {
+        try (PreparedStatement statement = DatabaseUtil.getPreparedStatementGetGeneratedKeys(sql)) {
             statement.setString(1, writer.getFirstName());
             statement.setString(2, writer.getLastName());
             statement.executeUpdate();
@@ -26,6 +25,7 @@ public class JdbcWriterRepositoryImpl implements WriterRepository {
                     writer.setId(generatedKeys.getLong(1));
                 }
             }
+            statement.getConnection().commit();
         } catch (SQLException e) {
             e.printStackTrace();
         }
@@ -35,11 +35,12 @@ public class JdbcWriterRepositoryImpl implements WriterRepository {
     @Override
     public Writer update(Writer writer) {
         String sql = "UPDATE writers SET first_name = ?, last_name = ? WHERE id = ?";
-        try (PreparedStatement statement = connection.prepareStatement(sql)) {
+        try (PreparedStatement statement = DatabaseUtil.getPreparedStatementWithoutAutoCommit(sql)) {
             statement.setString(1, writer.getFirstName());
             statement.setString(2, writer.getLastName());
             statement.setLong(3, writer.getId());
             statement.executeUpdate();
+            statement.getConnection().commit();
         } catch (SQLException e) {
             e.printStackTrace();
         }
@@ -49,7 +50,7 @@ public class JdbcWriterRepositoryImpl implements WriterRepository {
     @Override
     public Writer getById(Long id) {
         String sql = "SELECT * FROM writers WHERE id = ?";
-        try (PreparedStatement statement = connection.prepareStatement(sql)) {
+        try (PreparedStatement statement = DatabaseUtil.getPreparedStatementWithoutAutoCommit(sql)) {
             statement.setLong(1, id);
             ResultSet resultSet = statement.executeQuery();
             if (resultSet.next()) {
@@ -66,9 +67,10 @@ public class JdbcWriterRepositoryImpl implements WriterRepository {
     @Override
     public void deleteById(Long id) {
         String sql = "DELETE FROM writers WHERE id = ?";
-        try (PreparedStatement statement = connection.prepareStatement(sql)) {
+        try (PreparedStatement statement = DatabaseUtil.getPreparedStatementWithoutAutoCommit(sql)) {
             statement.setLong(1, id);
             statement.executeUpdate();
+            statement.getConnection().commit();
         } catch (SQLException e) {
             e.printStackTrace();
         }
@@ -78,8 +80,8 @@ public class JdbcWriterRepositoryImpl implements WriterRepository {
     public List<Writer> getAll() {
         List<Writer> writers = new ArrayList<>();
         String sql = "SELECT * FROM writers";
-        try (Statement statement = connection.createStatement();
-             ResultSet resultSet = statement.executeQuery(sql)) {
+        try (PreparedStatement statement = DatabaseUtil.getPreparedStatementWithoutAutoCommit(sql);
+             ResultSet resultSet = statement.executeQuery()) {
             while (resultSet.next()) {
                 Writer writer = mapResultSetToWriter(resultSet);
                 writer.setPosts(getPostsByWriterId(writer.getId()));
@@ -102,9 +104,8 @@ public class JdbcWriterRepositoryImpl implements WriterRepository {
 
     private List<Post> getPostsByWriterId(Long writerId) {
         List<Post> posts = new ArrayList<>();
-        // Берем все посты, привязанные к этому автору
         String sql = "SELECT * FROM posts WHERE writer_id = ?";
-        try (PreparedStatement statement = connection.prepareStatement(sql)) {
+        try (PreparedStatement statement = DatabaseUtil.getPreparedStatementWithoutAutoCommit(sql)) {
             statement.setLong(1, writerId);
             ResultSet rs = statement.executeQuery();
             while (rs.next()) {

@@ -11,21 +11,13 @@ import java.util.ArrayList;
 import java.util.List;
 
 public class JdbcPostRepositoryImpl implements PostRepository {
-    private final Connection connection;
 
-    public JdbcPostRepositoryImpl() {
-        this.connection = DatabaseUtil.getConnection();
-        try {
-            this.connection.setAutoCommit(false);
-        } catch (SQLException e) {
-            throw new RuntimeException("Failed to configure DB connection (autoCommit=false)", e);
-        }
-    }
+    public JdbcPostRepositoryImpl() {}
 
     @Override
     public Post save(Post post) {
         String insertPostSql = "INSERT INTO posts (content, created, updated, status, writer_id) VALUES (?, ?, ?, ?, ?)";
-        try (PreparedStatement statement = connection.prepareStatement(insertPostSql, Statement.RETURN_GENERATED_KEYS)) {
+        try (PreparedStatement statement = DatabaseUtil.getPreparedStatementGetGeneratedKeys(insertPostSql)) {
             statement.setString(1, post.getContent());
             statement.setTimestamp(2, Timestamp.valueOf(post.getCreated()));
             statement.setTimestamp(3, Timestamp.valueOf(post.getUpdated()));
@@ -46,7 +38,7 @@ public class JdbcPostRepositoryImpl implements PostRepository {
             }
 
             savePostLabels(post);
-            connection.commit();
+            statement.getConnection().commit();
 
         } catch (SQLException e) {
             rollbackQuietly();
@@ -58,7 +50,7 @@ public class JdbcPostRepositoryImpl implements PostRepository {
     @Override
     public Post update(Post post) {
         String updateSql = "UPDATE posts SET content = ?, updated = ?, status = ? WHERE id = ?";
-        try (PreparedStatement statement = connection.prepareStatement(updateSql)) {
+        try (PreparedStatement statement = DatabaseUtil.getPreparedStatementWithoutAutoCommit(updateSql)) {
             statement.setString(1, post.getContent());
             statement.setTimestamp(2, Timestamp.valueOf(post.getUpdated()));
             statement.setString(3, post.getStatus().toString());
@@ -67,7 +59,7 @@ public class JdbcPostRepositoryImpl implements PostRepository {
 
             deletePostLabels(post.getId());
             savePostLabels(post);
-            connection.commit();
+            statement.getConnection().commit();
 
         } catch (SQLException e) {
             rollbackQuietly();
@@ -93,43 +85,10 @@ public class JdbcPostRepositoryImpl implements PostRepository {
             LEFT JOIN labels l ON l.id = pl.label_id
             WHERE p.id = ?
         """;
-        try (PreparedStatement statement = connection.prepareStatement(sql)) {
+        try (PreparedStatement statement = DatabaseUtil.getPreparedStatementWithoutAutoCommit(sql)) {
             statement.setLong(1, id);
             try (ResultSet resultSet = statement.executeQuery()) {
-                Post post = null;
-                List<Label> labels = new ArrayList<>();
-
-                while (resultSet.next()) {
-                    if (post == null) {
-                        post = new Post();
-                        post.setId(resultSet.getLong("post_id"));
-
-                        long writerId = resultSet.getLong("writer_id");
-                        post.setWriterId(resultSet.wasNull() ? null : writerId);
-
-                        post.setContent(resultSet.getString("content"));
-
-                        Timestamp created = resultSet.getTimestamp("created");
-                        if (created != null) post.setCreated(created.toLocalDateTime());
-
-                        Timestamp updated = resultSet.getTimestamp("updated");
-                        if (updated != null) post.setUpdated(updated.toLocalDateTime());
-
-                        post.setStatus(PostStatus.valueOf(resultSet.getString("status")));
-                    }
-
-                    long labelId = resultSet.getLong("label_id");
-                    if (!resultSet.wasNull()) {
-                        labels.add(new Label(labelId, resultSet.getString("label_name")));
-                    }
-                }
-
-                if (post != null) {
-                    post.setLabels(labels);
-                }
-
-                connection.commit();
-                return post;
+                return mapResultSetToPostWithLabels(resultSet);
             }
         } catch (SQLException e) {
             rollbackQuietly();
@@ -139,12 +98,12 @@ public class JdbcPostRepositoryImpl implements PostRepository {
 
     @Override
     public void deleteById(Long id) {
-        String sql = "DELETE FROM posts WHERE id = ?";
-        try (PreparedStatement statement = connection.prepareStatement(sql)) {
-            deletePostLabels(id);
-            statement.setLong(1, id);
+        String sql = "UPDATE posts SET status = ?, updated = CURRENT_TIMESTAMP WHERE id = ?";
+        try (PreparedStatement statement = DatabaseUtil.getPreparedStatementWithoutAutoCommit(sql)) {
+            statement.setString(1, PostStatus.DELETED.toString());
+            statement.setLong(2, id);
             statement.executeUpdate();
-            connection.commit();
+            statement.getConnection().commit();
         } catch (SQLException e) {
             rollbackQuietly();
             throw new RuntimeException("Failed to delete post id=" + id, e);
@@ -155,14 +114,13 @@ public class JdbcPostRepositoryImpl implements PostRepository {
     public List<Post> getAll() {
         List<Post> posts = new ArrayList<>();
         String sql = "SELECT * FROM posts";
-        try (Statement statement = connection.createStatement();
-             ResultSet resultSet = statement.executeQuery(sql)) {
+        try (PreparedStatement statement = DatabaseUtil.getPreparedStatementWithAutoCommit(sql);
+             ResultSet resultSet = statement.executeQuery()) {
             while (resultSet.next()) {
                 Post post = mapResultSetToPost(resultSet);
                 post.setLabels(getLabelsByPostId(post.getId()));
                 posts.add(post);
             }
-            connection.commit();
         } catch (SQLException e) {
             rollbackQuietly();
             throw new RuntimeException("Failed to get all posts", e);
@@ -175,7 +133,7 @@ public class JdbcPostRepositoryImpl implements PostRepository {
         if (post.getLabels() == null || post.getLabels().isEmpty()) return;
 
         String sql = "INSERT INTO post_labels (post_id, label_id) VALUES (?, ?)";
-        try (PreparedStatement statement = connection.prepareStatement(sql)) {
+        try (PreparedStatement statement = DatabaseUtil.getPreparedStatementWithoutAutoCommit(sql)) {
             for (Label label : post.getLabels()) {
                 statement.setLong(1, post.getId());
                 statement.setLong(2, label.getId());
@@ -187,7 +145,7 @@ public class JdbcPostRepositoryImpl implements PostRepository {
 
     private void deletePostLabels(Long postId) throws SQLException {
         String sql = "DELETE FROM post_labels WHERE post_id = ?";
-        try (PreparedStatement statement = connection.prepareStatement(sql)) {
+        try (PreparedStatement statement = DatabaseUtil.getPreparedStatementWithoutAutoCommit(sql)) {
             statement.setLong(1, postId);
             statement.executeUpdate();
         }
@@ -202,7 +160,7 @@ public class JdbcPostRepositoryImpl implements PostRepository {
             WHERE pl.post_id = ?
         """;
 
-        try (PreparedStatement statement = connection.prepareStatement(sql)) {
+        try (PreparedStatement statement = DatabaseUtil.getPreparedStatementWithoutAutoCommit(sql)) {
             statement.setLong(1, postId);
             ResultSet rs = statement.executeQuery();
             while (rs.next()) {
@@ -229,11 +187,47 @@ public class JdbcPostRepositoryImpl implements PostRepository {
         return post;
     }
 
-    private void rollbackQuietly() {
-        try {
-            connection.rollback();
-        } catch (SQLException ignored) {
-            // ignore rollback failure
+    private Post mapResultSetToPostWithLabels(ResultSet resultSet) throws SQLException {
+        {
+            Post post = null;
+            List<Label> labels = new ArrayList<>();
+
+            while (resultSet.next()) {
+                if (post == null) {
+                    post = new Post();
+                    post.setId(resultSet.getLong("post_id"));
+
+                    long writerId = resultSet.getLong("writer_id");
+                    post.setWriterId(resultSet.wasNull() ? null : writerId);
+
+                    post.setContent(resultSet.getString("content"));
+
+                    Timestamp created = resultSet.getTimestamp("created");
+                    if (created != null) post.setCreated(created.toLocalDateTime());
+
+                    Timestamp updated = resultSet.getTimestamp("updated");
+                    if (updated != null) post.setUpdated(updated.toLocalDateTime());
+
+                    post.setStatus(PostStatus.valueOf(resultSet.getString("status")));
+                }
+
+                long labelId = resultSet.getLong("label_id");
+                if (!resultSet.wasNull()) {
+                    labels.add(new Label(labelId, resultSet.getString("label_name")));
+                }
+            }
+
+            if (post != null) {
+                post.setLabels(labels);
+            }
+
+            return post;
         }
+    }
+
+
+
+    private void rollbackQuietly() {
+            DatabaseUtil.rollback();
     }
 }

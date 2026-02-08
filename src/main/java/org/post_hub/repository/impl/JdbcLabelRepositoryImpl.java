@@ -10,12 +10,10 @@ import java.util.List;
 
 public class JdbcLabelRepositoryImpl implements LabelRepository {
 
-    private final Connection connection = DatabaseUtil.getConnection();
-
     @Override
     public Label getById(Long id) {
         String sql = "SELECT * FROM labels WHERE id = ?";
-        try (PreparedStatement statement = connection.prepareStatement(sql)) {
+        try (PreparedStatement statement = DatabaseUtil.getPreparedStatementWithoutAutoCommit(sql)) {
             statement.setLong(1, id);
             ResultSet resultSet = statement.executeQuery();
             if (resultSet.next()) {
@@ -31,8 +29,8 @@ public class JdbcLabelRepositoryImpl implements LabelRepository {
     public List<Label> getAll() {
         List<Label> labels = new ArrayList<>();
         String sql = "SELECT * FROM labels";
-        try (Statement statement = connection.createStatement();
-             ResultSet resultSet = statement.executeQuery(sql)) {
+        try (PreparedStatement statement = DatabaseUtil.getPreparedStatementWithoutAutoCommit(sql);
+             ResultSet resultSet = statement.executeQuery()) {
             while (resultSet.next()) {
                 labels.add(mapResultSetToLabel(resultSet));
             }
@@ -45,7 +43,7 @@ public class JdbcLabelRepositoryImpl implements LabelRepository {
     @Override
     public Label save(Label label) {
         String sql = "INSERT INTO labels (name) VALUES (?)";
-        try (PreparedStatement statement = connection.prepareStatement(sql, Statement.RETURN_GENERATED_KEYS)) {
+        try (PreparedStatement statement = DatabaseUtil.getPreparedStatementGetGeneratedKeys(sql)) {
             statement.setString(1, label.getName());
             statement.executeUpdate();
             try (ResultSet generatedKeys = statement.getGeneratedKeys()) {
@@ -53,6 +51,7 @@ public class JdbcLabelRepositoryImpl implements LabelRepository {
                     label.setId(generatedKeys.getLong(1));
                 }
             }
+            statement.getConnection().commit();
         } catch (SQLException e) {
             e.printStackTrace();
         }
@@ -62,10 +61,11 @@ public class JdbcLabelRepositoryImpl implements LabelRepository {
     @Override
     public Label update(Label label) {
         String sql = "UPDATE labels SET name = ? WHERE id = ?";
-        try (PreparedStatement statement = connection.prepareStatement(sql)) {
+        try (PreparedStatement statement = DatabaseUtil.getPreparedStatementWithoutAutoCommit(sql)) {
             statement.setString(1, label.getName());
             statement.setLong(2, label.getId());
             statement.executeUpdate();
+            statement.getConnection().commit();
         } catch (SQLException e) {
             e.printStackTrace();
         }
@@ -75,9 +75,10 @@ public class JdbcLabelRepositoryImpl implements LabelRepository {
     @Override
     public void deleteById(Long id) {
         String sql = "DELETE FROM labels WHERE id = ?";
-        try (PreparedStatement statement = connection.prepareStatement(sql)) {
+        try (PreparedStatement statement = DatabaseUtil.getPreparedStatementWithoutAutoCommit(sql)) {
             statement.setLong(1, id);
             statement.executeUpdate();
+            statement.getConnection().commit();
         } catch (SQLException e) {
             e.printStackTrace();
         }

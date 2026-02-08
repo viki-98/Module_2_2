@@ -16,7 +16,7 @@ import org.post_hub.view.ConsoleView;
 
 import java.sql.Connection;
 
-public final class Application {
+public final class ApplicationContext {
 
     public void run() {
         runLiquibase();
@@ -36,7 +36,7 @@ public final class Application {
     }
 
     private void runLiquibase() {
-        try (Connection connection = DatabaseUtil.getConnection()) {
+        try (Connection connection = DatabaseUtil.getConnectionForLB()) {
             Database database = DatabaseFactory.getInstance()
                     .findCorrectDatabaseImplementation(new JdbcConnection(connection));
             Liquibase liquibase = new Liquibase(
