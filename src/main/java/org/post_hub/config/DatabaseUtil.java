@@ -37,13 +37,6 @@ public final class DatabaseUtil {
         return local;
     }
 
-    public static void commit() {
-        try {
-            getInstance().createConnection().commit();
-        } catch (SQLException e) {
-            throw new RuntimeException(e);
-        }
-    }
 
 
     private static Connection getConnection(boolean commit) {
